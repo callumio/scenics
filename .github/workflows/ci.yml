@@ -1,0 +1,63 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  detect-changes:
+    name: Check for changed packages
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.changes.outputs.packages }}
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Detect changed packages
+      id: changes
+      run: |
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)
+        else
+          CHANGED_FILES=$(git diff --name-only HEAD~1)
+        fi
+
+        PACKAGES=$(echo "$CHANGED_FILES" | ./tools/changed_packages.sh)
+
+        echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+        echo "Changed packages: $PACKAGES"
+
+  build:
+    name: Build package
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.packages != '{"include":[]}'
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    steps:
+    - uses: actions/checkout@v5
+    - uses: cachix/install-nix-action@v31
+      with:
+        github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+    - uses: cachix/cachix-action@v16
+      with:
+        name: scenics
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        skipPush: true
+        useDaemon: true
+
+    - name: Build ${{ matrix.package }}
+      run: nix build .#${{ matrix.package }}
+
+  buildall:
+    name: Build Packages
+    needs: build
+    runs-on: ubuntu-latest
+    if: failure() || cancelled()
+    steps:
+    - name: Fail on purpose
+      run: exit 1

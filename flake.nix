@@ -60,7 +60,7 @@
 
       devShells.default = pkgs.mkShell {
         inherit (git-hook-check) shellHook;
-        buildInputs = with pkgs; [nix-init alejandra];
+        buildInputs = with pkgs; [nix-init alejandra jq];
       };
 
       formatter = pkgs.alejandra;

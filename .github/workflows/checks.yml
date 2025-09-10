@@ -1,0 +1,23 @@
+name: Checks
+on:
+  push:
+  pull_request:
+
+jobs:
+  flake-check:
+    name: Flake Check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - uses: cachix/install-nix-action@v31
+      with:
+        github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+    - uses: cachix/cachix-action@v16
+      with:
+        name: scenics
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        useDaemon: true
+
+    - name: Check flake
+      run: nix flake check
